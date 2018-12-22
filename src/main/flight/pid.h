@@ -90,8 +90,7 @@ typedef struct pidProfile_s {
 
     uint8_t heading_hold_rate_limit;        // Maximum rotation rate HEADING_HOLD mode can feed to yaw rate PID controller
 
-    uint16_t rollPitchItermIgnoreRate;      // Experimental threshold for ignoring iterm for pitch and roll on certain rates
-    uint16_t yawItermIgnoreRate;            // Experimental threshold for ignoring iterm for yaw on certain rates
+    uint8_t itermWindupPointPercent;        // Experimental ITerm windup threshold, percent of motor saturation
 
     uint32_t axisAccelerationLimitYaw;          // Max rate of change of yaw angular rate setpoint (deg/s^2 = dps/s)
     uint32_t axisAccelerationLimitRollPitch;    // Max rate of change of roll/pitch angular rate setpoint (deg/s^2 = dps/s)
@@ -105,6 +104,7 @@ typedef struct pidProfile_s {
     uint16_t    fixedWingItermThrowLimit;
     float       fixedWingReferenceAirspeed;     // Reference tuning airspeed for the airplane - the speed for which PID gains are tuned
     float       fixedWingCoordinatedYawGain;    // This is the gain of the yaw rate required to keep the yaw rate consistent with the turn rate for a coordinated turn.
+    float       fixedWingItermLimitOnStickPosition;   //Do not allow Iterm to grow when stick position is above this point
 } pidProfile_t;
 
 typedef struct pidAutotuneConfig_s {

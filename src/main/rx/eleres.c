@@ -40,6 +40,7 @@
 #include "sensors/battery.h"
 #include "sensors/sensors.h"
 #include "sensors/barometer.h"
+#include "sensors/temperature.h"
 #include "scheduler/scheduler.h"
 
 #ifdef USE_RX_ELERES
@@ -272,7 +273,7 @@ static void telemetryRX(void)
     presfil  -= presfil/4;
     presfil  += baro.baroPressure;
     thempfil -= thempfil/8;
-    thempfil += baro.baroTemperature/10;
+    thempfil += DEGREES_TO_DECIDEGREES(getCurrentTemperature());
 
     switch (telem_state++) {
     case 0:
@@ -325,7 +326,7 @@ static void telemetryRX(void)
     case 2:
         if (sensors(SENSOR_GPS)) {
             uint16_t gpsspeed =  (gpsSol.groundSpeed*9L)/250L;
-            int16_t course = (gpsSol.groundCourse+360)%360;
+            int16_t course = (gpsSol.groundCourse/10 + 360)%360;
 #ifdef USE_NAV
             int32_t alt = getEstimatedActualPosition(Z);
 #else

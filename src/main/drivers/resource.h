@@ -21,6 +21,7 @@
 
 typedef enum {
     OWNER_FREE = 0,
+    OWNER_PWMIO,
     OWNER_PWMINPUT,
     OWNER_PPMINPUT,
     OWNER_MOTOR,
@@ -52,6 +53,7 @@ typedef enum {
     OWNER_COMPASS,
     OWNER_AIRSPEED,
     OWNER_OLED_DISPLAY,
+    OWNER_PINIO,
     OWNER_TOTAL_COUNT
 } resourceOwner_e;
 

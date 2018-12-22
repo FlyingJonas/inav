@@ -23,6 +23,8 @@
 
 #include "config/parameter_group.h"
 
+#define BOXID_NONE 255
+
 typedef enum {
     BOXARM          = 0,
     BOXANGLE        = 1,
@@ -56,7 +58,14 @@ typedef enum {
     BOXCAMERA1      = 29,
     BOXCAMERA2      = 30,
     BOXCAMERA3      = 31,
-    BOXFPVANGLEMIX  = 32,
+    BOXOSDALT1      = 32,
+    BOXOSDALT2      = 33,
+    BOXOSDALT3      = 34,
+    BOXNAVCRUISE    = 35,
+    BOXBRAKING      = 36,
+    BOXUSER1        = 37,
+    BOXUSER2        = 38,
+    BOXFPVANGLEMIX  = 39,
     CHECKBOX_ITEM_COUNT
 } boxId_e;
 
@@ -68,11 +77,13 @@ typedef struct boxBitmask_s { BITARRAY_DECLARE(bits, CHECKBOX_ITEM_COUNT); } box
 #define CHANNEL_RANGE_MIN 900
 #define CHANNEL_RANGE_MAX 2100
 
-#define MODE_STEP_TO_CHANNEL_VALUE(step) (CHANNEL_RANGE_MIN + 25 * step)
-#define CHANNEL_VALUE_TO_STEP(channelValue) ((constrain(channelValue, CHANNEL_RANGE_MIN, CHANNEL_RANGE_MAX) - CHANNEL_RANGE_MIN) / 25)
+#define CHANNEL_RANGE_STEP_WIDTH 25
+
+#define MODE_STEP_TO_CHANNEL_VALUE(step) (CHANNEL_RANGE_MIN + CHANNEL_RANGE_STEP_WIDTH * step)
+#define CHANNEL_VALUE_TO_STEP(channelValue) ((constrain(channelValue, CHANNEL_RANGE_MIN, CHANNEL_RANGE_MAX) - CHANNEL_RANGE_MIN) / CHANNEL_RANGE_STEP_WIDTH)
 
 #define MIN_MODE_RANGE_STEP 0
-#define MAX_MODE_RANGE_STEP ((CHANNEL_RANGE_MAX - CHANNEL_RANGE_MIN) / 25)
+#define MAX_MODE_RANGE_STEP ((CHANNEL_RANGE_MAX - CHANNEL_RANGE_MIN) / CHANNEL_RANGE_STEP_WIDTH)
 
 #define IS_RANGE_USABLE(range) ((range)->startStep < (range)->endStep)
 

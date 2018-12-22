@@ -47,6 +47,8 @@
 #include "drivers/accgyro/accgyro_adxl345.h"
 #include "drivers/accgyro/accgyro_mma845x.h"
 #include "drivers/accgyro/accgyro_bma280.h"
+#include "drivers/accgyro/accgyro_bmi160.h"
+#include "drivers/accgyro/accgyro_icm20689.h"
 #include "drivers/accgyro/accgyro_fake.h"
 #include "drivers/io.h"
 #include "drivers/logging.h"
@@ -93,7 +95,13 @@ STATIC_FASTRAM filterApplyFnPtr notchFilter2ApplyFn;
 STATIC_FASTRAM void *notchFilter2[XYZ_AXIS_COUNT];
 #endif
 
-PG_REGISTER_WITH_RESET_TEMPLATE(gyroConfig_t, gyroConfig, PG_GYRO_CONFIG, 2);
+#if defined(USE_GYRO_BIQUAD_RC_FIR2)
+// gyro biquad RC FIR2 filter
+STATIC_FASTRAM filterApplyFnPtr gyroFilterStage2ApplyFn;
+STATIC_FASTRAM void *stage2Filter[XYZ_AXIS_COUNT];
+#endif
+
+PG_REGISTER_WITH_RESET_TEMPLATE(gyroConfig_t, gyroConfig, PG_GYRO_CONFIG, 4);
 
 PG_RESET_TEMPLATE(gyroConfig_t, gyroConfig,
     .gyro_lpf = GYRO_LPF_42HZ,      // 42HZ value is defined for Invensense/TDK gyros
@@ -101,12 +109,13 @@ PG_RESET_TEMPLATE(gyroConfig_t, gyroConfig,
     .gyro_align = ALIGN_DEFAULT,
     .gyroMovementCalibrationThreshold = 32,
     .looptime = 1000,
-    .gyroSync = 0,
+    .gyroSync = 1,
     .gyro_to_use = 0,
     .gyro_soft_notch_hz_1 = 0,
     .gyro_soft_notch_cutoff_1 = 1,
     .gyro_soft_notch_hz_2 = 0,
-    .gyro_soft_notch_cutoff_2 = 1
+    .gyro_soft_notch_cutoff_2 = 1,
+    .gyro_stage2_lowpass_hz = 0
 );
 
 STATIC_UNIT_TESTED gyroSensor_e gyroDetect(gyroDev_t *dev, gyroSensor_e gyroHardware)
@@ -201,6 +210,30 @@ STATIC_UNIT_TESTED gyroSensor_e gyroDetect(gyroDev_t *dev, gyroSensor_e gyroHard
         FALLTHROUGH;
 #endif
 
+#ifdef USE_GYRO_BMI160
+    case GYRO_BMI160:
+        if (bmi160GyroDetect(dev)) {
+            gyroHardware = GYRO_BMI160;
+#ifdef GYRO_BMI160_ALIGN
+            dev->gyroAlign = GYRO_BMI160_ALIGN;
+#endif
+            break;
+        }
+        FALLTHROUGH;
+#endif
+
+#ifdef USE_GYRO_ICM20689
+    case GYRO_ICM20689:
+        if (icm20689GyroDetect(dev)) {
+            gyroHardware = GYRO_ICM20689;
+#ifdef GYRO_ICM20689_ALIGN
+            dev->gyroAlign = GYRO_ICM20689_ALIGN;
+#endif
+            break;
+        }
+        FALLTHROUGH;
+#endif
+
 #ifdef USE_FAKE_GYRO
     case GYRO_FAKE:
         if (fakeGyroDetect(dev)) {
@@ -269,11 +302,24 @@ void gyroInitFilters(void)
     notchFilter2ApplyFn = nullFilterApply;
 #endif
 
+#ifdef USE_GYRO_BIQUAD_RC_FIR2
+    STATIC_FASTRAM biquadFilter_t gyroFilterStage2[XYZ_AXIS_COUNT];
+    gyroFilterStage2ApplyFn = nullFilterApply;
+
+    if (gyroConfig()->gyro_stage2_lowpass_hz > 0) {
+        gyroFilterStage2ApplyFn = (filterApplyFnPtr)biquadFilterApply;
+        for (int axis = 0; axis < 3; axis++) {
+            stage2Filter[axis] = &gyroFilterStage2[axis];
+            biquadRCFIR2FilterInit(stage2Filter[axis], gyroConfig()->gyro_stage2_lowpass_hz, getLooptime());
+        }
+    }
+#endif
+
     if (gyroConfig()->gyro_soft_lpf_hz) {
         softLpfFilterApplyFn = (filterApplyFnPtr)biquadFilterApply;
         for (int axis = 0; axis < 3; axis++) {
             softLpfFilter[axis] = &gyroFilterLPF[axis];
-            biquadFilterInitLPF(softLpfFilter[axis], gyroConfig()->gyro_soft_lpf_hz, getGyroUpdateRate());
+            biquadFilterInitLPF(softLpfFilter[axis], gyroConfig()->gyro_soft_lpf_hz, getLooptime());
         }
     }
 
@@ -282,7 +328,7 @@ void gyroInitFilters(void)
         notchFilter1ApplyFn = (filterApplyFnPtr)biquadFilterApply;
         for (int axis = 0; axis < 3; axis++) {
             notchFilter1[axis] = &gyroFilterNotch_1[axis];
-            biquadFilterInitNotch(notchFilter1[axis], getGyroUpdateRate(), gyroConfig()->gyro_soft_notch_hz_1, gyroConfig()->gyro_soft_notch_cutoff_1);
+            biquadFilterInitNotch(notchFilter1[axis], getLooptime(), gyroConfig()->gyro_soft_notch_hz_1, gyroConfig()->gyro_soft_notch_cutoff_1);
         }
     }
 #endif
@@ -292,7 +338,7 @@ void gyroInitFilters(void)
         notchFilter2ApplyFn = (filterApplyFnPtr)biquadFilterApply;
         for (int axis = 0; axis < 3; axis++) {
             notchFilter2[axis] = &gyroFilterNotch_2[axis];
-            biquadFilterInitNotch(notchFilter2[axis], getGyroUpdateRate(), gyroConfig()->gyro_soft_notch_hz_2, gyroConfig()->gyro_soft_notch_cutoff_2);
+            biquadFilterInitNotch(notchFilter2[axis], getLooptime(), gyroConfig()->gyro_soft_notch_hz_2, gyroConfig()->gyro_soft_notch_cutoff_2);
         }
     }
 #endif
@@ -358,40 +404,17 @@ STATIC_UNIT_TESTED void performGyroCalibration(gyroDev_t *dev, gyroCalibration_t
     gyroCalibration->calibratingG--;
 }
 
-#ifdef USE_ASYNC_GYRO_PROCESSING
-STATIC_FASTRAM float accumulatedRates[XYZ_AXIS_COUNT];
-STATIC_FASTRAM timeUs_t accumulatedRateTimeUs;
-
-static void gyroUpdateAccumulatedRates(timeDelta_t gyroUpdateDeltaUs)
-{
-    accumulatedRateTimeUs += gyroUpdateDeltaUs;
-    const float gyroUpdateDelta = gyroUpdateDeltaUs * 1e-6f;
-    for (int axis = 0; axis < 3; axis++) {
-        accumulatedRates[axis] += gyro.gyroADCf[axis] * gyroUpdateDelta;
-    }
-}
-#endif
-
 /*
  * Calculate rotation rate in rad/s in body frame
  */
 void gyroGetMeasuredRotationRate(fpVector3_t *measuredRotationRate)
 {
-#ifdef USE_ASYNC_GYRO_PROCESSING
-    const float accumulatedRateTime = accumulatedRateTimeUs * 1e-6;
-    accumulatedRateTimeUs = 0;
-    for (int axis = 0; axis < 3; axis++) {
-        measuredRotationRate->v[axis] = DEGREES_TO_RADIANS(accumulatedRates[axis] / accumulatedRateTime);
-        accumulatedRates[axis] = 0.0f;
-    }
-#else
     for (int axis = 0; axis < 3; axis++) {
         measuredRotationRate->v[axis] = DEGREES_TO_RADIANS(gyro.gyroADCf[axis]);
     }
-#endif
 }
 
-void gyroUpdate(timeDelta_t gyroUpdateDeltaUs)
+void gyroUpdate()
 {
     // range: +/- 8192; +/- 2000 deg/sec
     if (gyroDev0.readFn(&gyroDev0)) {
@@ -421,6 +444,18 @@ void gyroUpdate(timeDelta_t gyroUpdateDeltaUs)
 
         DEBUG_SET(DEBUG_GYRO, axis, lrintf(gyroADCf));
 
+        if (axis < 2) {
+            DEBUG_SET(DEBUG_STAGE2, axis, lrintf(gyroADCf));
+        }
+
+#ifdef USE_GYRO_BIQUAD_RC_FIR2
+        gyroADCf = gyroFilterStage2ApplyFn(stage2Filter[axis], gyroADCf);
+#endif
+
+        if (axis < 2) {
+            DEBUG_SET(DEBUG_STAGE2, axis + 2, lrintf(gyroADCf));
+        }
+
         gyroADCf = softLpfFilterApplyFn(softLpfFilter[axis], gyroADCf);
 
         DEBUG_SET(DEBUG_NOTCH, axis, lrintf(gyroADCf));
@@ -433,11 +468,6 @@ void gyroUpdate(timeDelta_t gyroUpdateDeltaUs)
 #endif
         gyro.gyroADCf[axis] = gyroADCf;
     }
-
-#ifdef USE_ASYNC_GYRO_PROCESSING
-    // Accumulate gyro readings for better IMU accuracy
-    gyroUpdateAccumulatedRates(gyroUpdateDeltaUs);
-#endif
 }
 
 bool gyroReadTemperature(void)

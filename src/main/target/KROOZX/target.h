@@ -28,9 +28,6 @@
 #define BEEPER                  PC1
 #define BEEPER_INVERTED
 
-#define INVERTER_PIN_UART1      PB13
-#define INVERTER_PIN_UART6      PB12
-
 #define MPU6000_CS_PIN          PB2
 #define MPU6000_SPI_BUS         BUS_SPI1
 
@@ -53,22 +50,20 @@
 #define USE_MAG_HMC5883
 #define USE_MAG_QMC5883
 #define USE_MAG_IST8310
+#define USE_MAG_IST8308
 #define USE_MAG_MAG3110
+#define USE_MAG_LIS3MDL
 
 #define USE_BARO
 #define BARO_I2C_BUS            BUS_I2C3
 #define USE_BARO_MS5611
 
 #define USE_SDCARD
+#define USE_SDCARD_SPI
+#define SDCARD_SPI_BUS          BUS_SPI3
+#define SDCARD_CS_PIN           PA15
 #define SDCARD_DETECT_INVERTED
-#define SDCARD_DETECT_PIN                   PC13
-#define SDCARD_SPI_INSTANCE                 SPI3
-#define SDCARD_SPI_CS_PIN                   PA15
-
-#define SDCARD_DMA_CHANNEL_TX               DMA1_Stream5
-#define SDCARD_DMA_CHANNEL_TX_COMPLETE_FLAG DMA_FLAG_TCIF5
-#define SDCARD_DMA_CLK                      RCC_AHB1Periph_DMA1
-#define SDCARD_DMA_CHANNEL                  DMA_Channel_0
+#define SDCARD_DETECT_PIN       PC13
 
 #define USE_OSD
 #ifdef USE_MSP_DISPLAYPORT
@@ -92,9 +87,12 @@
 
 #define USE_VCP
 
+#define USE_UART_INVERTER
+
 #define USE_UART1
 #define UART1_RX_PIN            PA10
 #define UART1_TX_PIN            PA9
+#define INVERTER_PIN_UART1_RX   PB13
 
 #define USE_UART3
 #define UART3_RX_PIN            PB11
@@ -111,6 +109,7 @@
 #define USE_UART6
 #define UART6_RX_PIN            PC7
 #define UART6_TX_PIN            PC6
+#define INVERTER_PIN_UART6_RX   PB12
 
 #define SERIAL_PORT_COUNT       6
 
@@ -135,6 +134,7 @@
 #define SPI3_SCK_PIN            PB3
 #define SPI3_MISO_PIN           PB4
 #define SPI3_MOSI_PIN           PB5
+#define SPI3_CLOCK_LEADING_EDGE
 
 #define ENABLE_BLACKBOX_LOGGING_ON_SDCARD_BY_DEFAULT
 
@@ -145,16 +145,7 @@
 #define DEFAULT_FEATURES        (FEATURE_TX_PROF_SEL | FEATURE_VBAT | FEATURE_CURRENT_METER | FEATURE_OSD)
 
 #define USE_LED_STRIP
-#define WS2811_GPIO_AF                  GPIO_AF_TIM3
 #define WS2811_PIN                      PC6
-#define WS2811_TIMER                    TIM3
-#define WS2811_TIMER_CHANNEL            TIM_Channel_1
-#define WS2811_DMA_HANDLER_IDENTIFER    DMA1_ST4_HANDLER
-#define WS2811_DMA_STREAM               DMA1_Stream4
-#define WS2811_DMA_CHANNEL              DMA_Channel_5
-#define WS2811_DMA_IRQ                  DMA1_Stream4_IRQn
-#define WS2811_DMA_FLAG                 DMA_FLAG_TCIF4
-#define WS2811_DMA_IT                   DMA_IT_TCIF4
 
 #define USE_SERIAL_4WAY_BLHELI_INTERFACE
 
@@ -164,5 +155,3 @@
 #define TARGET_IO_PORTD         (BIT(2))
 
 #define MAX_PWM_OUTPUT_PORTS    10
-#define USABLE_TIMER_CHANNEL_COUNT 11
-#define USED_TIMERS             (TIM_N(3) | TIM_N(4) | TIM_N(5) | TIM_N(8) | TIM_N(12))
